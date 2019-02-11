@@ -88,7 +88,7 @@ double fitnessWithSizePressure ( struct parameters *params, struct chromosome *c
             saveChromosome ( chromo, "./../data/best.chro" );
         }
     }
-    return svl_fitness;// +getNumChromosomeActiveNodes ( chromo ) / 24.0;
+    return svl_fitness + getNumChromosomeActiveNodes ( chromo ) / 24.0;
 }
 
 
