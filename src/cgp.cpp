@@ -462,7 +462,7 @@ static int addPresetFunctionToFunctionSet(struct parameters *params, char const 
     else if (strncmp(functionName, "rand", FUNCTIONNAMELENGTH) == 0) {
         addCustomNodeFunction(params, _randFloat, "rand", 0);
     }
-    else if ( strncmp ( functionName, "1", FUNCTIONNAMELENGTH ) == 0 ) {
+    else if ( strncmp ( functionName, "2", FUNCTIONNAMELENGTH ) == 0 ) {
         addCustomNodeFunction ( params, _constTwo, "2", 0 );
     }
     else if (strncmp(functionName, "1", FUNCTIONNAMELENGTH) == 0) {
