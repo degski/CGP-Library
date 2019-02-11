@@ -28,11 +28,10 @@
 #include <cstdlib>
 
 #include <iostream>
-
 #include <random>
-#include <splitmix.hpp>
 
-#include "cgp.hpp"
+#include "./../src/splitmix.hpp"
+#include "./../src/cgp.hpp"
 
 double radius ( const int numInputs, const double *inputs, const double *connectionWeights ) noexcept {
     return 3.0;
