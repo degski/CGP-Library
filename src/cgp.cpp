@@ -26,7 +26,7 @@
 #include <algorithm>
 #include <random>
 
-#include <splitmix.hpp>
+#include "splitmix.hpp"
 
 static splitmix64 rgen { std::random_device { } ( ) };
 
@@ -134,18 +134,18 @@ static void saveChromosomeLatexRecursive(struct chromosome *chromo, int index, F
 
 /* node functions */
 static struct node *initialiseNode(int numInputs, int numNodes, int arity, int numFunctions, double connectionWeightRange, double recurrentConnectionProbability, int nodePosition);
-static void freeNode(struct node *n) noexcept;
+static void freeNode(struct node *n);
 static void copyNode(struct node *nodeDest, struct node *nodeSrc);
 
 /* getting gene value functions  */
 static double getRandomConnectionWeight(double weightRange) noexcept;
-static int getRandomNodeInput(int numChromoInputs, int numNodes, int nodePosition, double recurrentConnectionProbability) noexcept;
-static int getRandomFunction(int numFunctions) noexcept;
-static int getRandomChromosomeOutput(int numInputs, int numNodes, int shortcutConnections) noexcept;
+static int getRandomNodeInput(int numChromoInputs, int numNodes, int nodePosition, double recurrentConnectionProbability);
+static int getRandomFunction(int numFunctions);
+static int getRandomChromosomeOutput(int numInputs, int numNodes, int shortcutConnections);
 
 /* function set functions */
-static int addPresetFuctionToFunctionSet(struct parameters *params, char const *functionName);
-static void copyFuctionSet(struct functionSet *funcSetDest, struct functionSet *funcSetSrc);
+static int addPresetFunctionToFunctionSet(struct parameters *params, char const *functionName);
+static void copyFunctionSet(struct functionSet *funcSetDest, struct functionSet *funcSetSrc);
 static void printFunctionSet(struct parameters *params);
 
 /* results functions */
@@ -164,9 +164,6 @@ static void selectFittest(struct parameters *params, struct chromosome **parents
 /* reproduction scheme functions */
 static void mutateRandomParent(struct parameters *params, struct chromosome **parents, struct chromosome **children, int numParents, int numChildren);
 
-/* fitness function */
-double supervisedLearning(struct parameters *params, struct chromosome *chromo, struct dataSet *data) noexcept;
-
 /* node functions defines in CGP-Library */
 static double _add(const int numInputs, const double *inputs, const double *connectionWeights) noexcept;
 static double _sub(const int numInputs, const double *inputs, const double *connectionWeights) noexcept;
@@ -183,6 +180,7 @@ static double _sine(const int numInputs, const double *inputs, const double *con
 static double _cosine(const int numInputs, const double *inputs, const double *connectionWeights) noexcept;
 static double _tangent(const int numInputs, const double *inputs, const double *connectionWeights) noexcept;
 static double _randFloat(const int numInputs, const double *inputs, const double *connectionWeights) noexcept;
+static double _constTwo ( const int numInputs, const double *inputs, const double *connectionWeights ) noexcept;
 static double _constOne(const int numInputs, const double *inputs, const double *connectionWeights) noexcept;
 static double _constZero(const int numInputs, const double *inputs, const double *connectionWeights) noexcept;
 static double _constPI(const int numInputs, const double *inputs, const double *connectionWeights) noexcept;
@@ -202,7 +200,7 @@ static double _hyperbolicTangent(const int numInputs, const double *inputs, cons
 /* other */
 static double randDecimal() noexcept;
 static int randInt(int n) noexcept;
-static double sumWeigtedInputs(const int numInputs, const double *inputs, const double *connectionWeights) noexcept;
+static double sumWeigtedInputs(const int numInputs, const double *inputs, const double *connectionWeights);
 static void sortIntArray(int *array, const int length);
 static void sortDoubleArray(double *array, const int length);
 static int cmpInt(const void * a, const void * b);
@@ -224,7 +222,7 @@ DLL_EXPORT struct parameters *initialiseParameters(const int numInputs, const in
     struct parameters *params;
 
     /* allocate memory for parameters */
-    params = (struct parameters*)malloc(sizeof(struct parameters));
+    params = (struct parameters*)std::malloc(sizeof(struct parameters));
 
     /* Set default values */
     params->mu = 1;
@@ -247,7 +245,7 @@ DLL_EXPORT struct parameters *initialiseParameters(const int numInputs, const in
     params->mutationType = probabilisticMutation;
     strncpy(params->mutationTypeName, "probabilistic", MUTATIONTYPENAMELENGTH);
 
-    params->funcSet = (struct functionSet*)malloc(sizeof(struct functionSet));
+    params->funcSet = (struct functionSet*)std::malloc(sizeof(struct functionSet));
     params->funcSet->numFunctions = 0;
 
     params->fitnessFunction = supervisedLearning;
@@ -269,15 +267,10 @@ DLL_EXPORT struct parameters *initialiseParameters(const int numInputs, const in
     Frees the memory associated with the given parameter structure
 */
 DLL_EXPORT void freeParameters(struct parameters *params) {
-
-    /* attempt to prevent user double freeing */
-    if (params == NULL) {
-        printf("Warning: double freeing of parameters prevented.\n");
-        return;
+    if ( params != nullptr ) {
+        free ( params->funcSet );
+        free ( params );
     }
-
-    free(params->funcSet);
-    free(params);
 }
 
 /*
@@ -285,7 +278,7 @@ DLL_EXPORT void freeParameters(struct parameters *params) {
 */
 DLL_EXPORT void printParameters(struct parameters *params) {
 
-    if (params == NULL) {
+    if ( params == nullptr ) {
         printf("Error: cannot print uninitialised parameters.\nTerminating CGP-Library.\n");
         exit(0);
     }
@@ -334,7 +327,7 @@ DLL_EXPORT void addNodeFunction(struct parameters *params, char const *functionN
     while (pch != NULL) {
 
         /* add the named function to the function set */
-        addPresetFuctionToFunctionSet(params, pch);
+        addPresetFunctionToFunctionSet(params, pch);
 
         /* get the next function name */
         pch = strtok(NULL, ", ");
@@ -375,7 +368,7 @@ DLL_EXPORT void addCustomNodeFunction(struct parameters *params, double (*functi
     used as an interface to adding pre-set node functions.
     returns one if successful, zero otherwise.
 */
-static int addPresetFuctionToFunctionSet(struct parameters *params, char const *functionName) {
+static int addPresetFunctionToFunctionSet(struct parameters *params, char const *functionName) {
 
     int successfullyAdded = 1;
 
@@ -468,6 +461,9 @@ static int addPresetFuctionToFunctionSet(struct parameters *params, char const *
 
     else if (strncmp(functionName, "rand", FUNCTIONNAMELENGTH) == 0) {
         addCustomNodeFunction(params, _randFloat, "rand", 0);
+    }
+    else if ( strncmp ( functionName, "1", FUNCTIONNAMELENGTH ) == 0 ) {
+        addCustomNodeFunction ( params, _constTwo, "2", 0 );
     }
     else if (strncmp(functionName, "1", FUNCTIONNAMELENGTH) == 0) {
         addCustomNodeFunction(params, _constOne, "1", 0);
@@ -597,7 +593,7 @@ DLL_EXPORT void setLambda(struct parameters *params, int lambda) {
 */
 DLL_EXPORT void setEvolutionaryStrategy(struct parameters *params, char evolutionaryStrategy) {
 
-    if (evolutionaryStrategy == '+' || evolutionaryStrategy == ',') {
+    if (evolutionaryStrategy == '+' or evolutionaryStrategy == ',') {
         params->evolutionaryStrategy = evolutionaryStrategy;
     }
     else {
@@ -613,7 +609,7 @@ DLL_EXPORT void setEvolutionaryStrategy(struct parameters *params, char evolutio
 */
 DLL_EXPORT void setMutationRate(struct parameters *params, double mutationRate) {
 
-    if (mutationRate >= 0 && mutationRate <= 1) {
+    if (mutationRate >= 0 and mutationRate <= 1) {
         params->mutationRate = mutationRate;
     }
     else {
@@ -628,7 +624,7 @@ DLL_EXPORT void setMutationRate(struct parameters *params, double mutationRate) 
 */
 DLL_EXPORT void setRecurrentConnectionProbability(struct parameters *params, double recurrentConnectionProbability) {
 
-    if (recurrentConnectionProbability >= 0 && recurrentConnectionProbability <= 1) {
+    if (recurrentConnectionProbability >= 0 and recurrentConnectionProbability <= 1) {
         params->recurrentConnectionProbability = recurrentConnectionProbability;
     }
     else {
@@ -643,7 +639,7 @@ DLL_EXPORT void setRecurrentConnectionProbability(struct parameters *params, dou
 */
 DLL_EXPORT void setShortcutConnections(struct parameters *params, int shortcutConnections) {
 
-    if (shortcutConnections == 0 || shortcutConnections == 1) {
+    if (shortcutConnections == 0 or shortcutConnections == 1) {
         params->shortcutConnections = shortcutConnections;
     }
     else {
@@ -662,7 +658,7 @@ DLL_EXPORT void setConnectionWeightRange(struct parameters *params, double weigh
 
 
 /*
-    sets the fitness function to the fitnessFuction passed. If the fitnessFuction is NULL
+    sets the fitness function to the fitnessFunction passed. If the fitnessFunction is NULL
     then the default supervisedLearning fitness function is used.
 */
 DLL_EXPORT void setCustomFitnessFunction(struct parameters *params, double (*fitnessFunction)(struct parameters *params, struct chromosome *chromo, struct dataSet *data), char const *fitnessFunctionName) {
@@ -814,19 +810,19 @@ DLL_EXPORT struct chromosome *initialiseChromosome(struct parameters *params) {
     }
 
     /* allocate memory for chromosome */
-    chromo = (struct chromosome*)malloc(sizeof(struct chromosome));
+    chromo = (struct chromosome*)std::malloc(sizeof(struct chromosome));
 
     /* allocate memory for nodes */
-    chromo->nodes = (struct node**)malloc(params->numNodes * sizeof(struct node*));
+    chromo->nodes = (struct node**)std::malloc(params->numNodes * sizeof(struct node*));
 
     /* allocate memory for outputNodes matrix */
-    chromo->outputNodes = (int*)malloc(params->numOutputs * sizeof(int));
+    chromo->outputNodes = (int*)std::malloc(params->numOutputs * sizeof(int));
 
     /* allocate memory for active nodes matrix */
-    chromo->activeNodes = (int*)malloc(params->numNodes * sizeof(int));
+    chromo->activeNodes = (int*)std::malloc(params->numNodes * sizeof(int));
 
     /* allocate memory for chromosome outputValues */
-    chromo->outputValues = (double*)malloc(params->numOutputs * sizeof(double));
+    chromo->outputValues = (double*)std::malloc(params->numOutputs * sizeof(double));
 
     /* Initialise each of the chromosomes nodes */
     for (i = 0; i < params->numNodes; i++) {
@@ -851,14 +847,14 @@ DLL_EXPORT struct chromosome *initialiseChromosome(struct parameters *params) {
     chromo->fitness = -1;
 
     /* copy the function set from the parameters to the chromosome */
-    chromo->funcSet = (struct functionSet*)malloc(sizeof(struct functionSet));
-    copyFuctionSet(chromo->funcSet, params->funcSet);
+    chromo->funcSet = (struct functionSet*)std::malloc(sizeof(struct functionSet));
+    copyFunctionSet(chromo->funcSet, params->funcSet);
 
     /* set the active nodes in the newly generated chromosome */
     setChromosomeActiveNodes(chromo);
 
     /* used interally when exicuting chromosome */
-    chromo->nodeInputsHold = (double*)malloc(params->arity * sizeof(double));
+    chromo->nodeInputsHold = (double*)std::malloc(params->arity * sizeof(double));
 
     return chromo;
 }
@@ -933,7 +929,7 @@ DLL_EXPORT struct chromosome* initialiseChromosomeFromFile(char const *file) {
         strncpy(funcName, record, FUNCTIONNAMELENGTH);
 
         /* can only load functions defined within CGP-Library */
-        if (addPresetFuctionToFunctionSet(params, funcName) == 0) {
+        if (addPresetFunctionToFunctionSet(params, funcName) == 0) {
             printf("Error: cannot load chromosome which contains custom node functions.\n");
             printf("Terminating CGP-Library.\n");
             freeParameters(params);
@@ -995,19 +991,19 @@ DLL_EXPORT struct chromosome *initialiseChromosomeFromChromosome(struct chromoso
     }
 
     /* allocate memory for chromosome */
-    chromoNew = (struct chromosome*)malloc(sizeof(struct chromosome));
+    chromoNew = (struct chromosome*)std::malloc(sizeof(struct chromosome));
 
     /* allocate memory for nodes */
-    chromoNew->nodes = (struct node**)malloc(chromo->numNodes * sizeof(struct node*));
+    chromoNew->nodes = (struct node**)std::malloc(chromo->numNodes * sizeof(struct node*));
 
     /* allocate memory for outputNodes matrix */
-    chromoNew->outputNodes = (int*)malloc(chromo->numOutputs * sizeof(int));
+    chromoNew->outputNodes = (int*)std::malloc(chromo->numOutputs * sizeof(int));
 
     /* allocate memory for active nodes matrix */
-    chromoNew->activeNodes = (int*)malloc(chromo->numNodes * sizeof(int));
+    chromoNew->activeNodes = (int*)std::malloc(chromo->numNodes * sizeof(int));
 
     /* allocate memory for chromosome outputValues */
-    chromoNew->outputValues = (double*)malloc(chromo->numOutputs * sizeof(double));
+    chromoNew->outputValues = (double*)std::malloc(chromo->numOutputs * sizeof(double));
 
     /* Initialise each of the chromosomes nodes */
     for (i = 0; i < chromo->numNodes; i++) {
@@ -1034,14 +1030,14 @@ DLL_EXPORT struct chromosome *initialiseChromosomeFromChromosome(struct chromoso
     chromoNew->generation = chromo->generation;
 
     /* copy over the functionset */
-    chromoNew->funcSet = (struct functionSet*)malloc(sizeof(struct functionSet));
-    copyFuctionSet(chromoNew->funcSet, chromo->funcSet);
+    chromoNew->funcSet = (struct functionSet*)std::malloc(sizeof(struct functionSet));
+    copyFunctionSet(chromoNew->funcSet, chromo->funcSet);
 
     /* set the active nodes in the newly generated chromosome */
     setChromosomeActiveNodes(chromoNew);
 
     /* used internally by exicute chromosome */
-    chromoNew->nodeInputsHold = (double*)malloc(chromo->arity * sizeof(double));
+    chromoNew->nodeInputsHold = (double*)std::malloc(chromo->arity * sizeof(double));
 
     return chromoNew;
 }
@@ -1083,7 +1079,7 @@ DLL_EXPORT void printChromosome(struct chromosome *chromo, int weights) {
     int i, j;
 
     /* error checking */
-    if (chromo == NULL) {
+    if (chromo == nullptr) {
         printf("Error: chromosome has not been initialised and cannot be printed.\n");
         return;
     }
@@ -1143,7 +1139,7 @@ DLL_EXPORT void executeChromosome(struct chromosome *chromo, const double *input
     int i, j;
     int nodeInputLocation;
     int currentActiveNode;
-    int currentActiveNodeFuction;
+    int currentActiveNodeFunction;
     int nodeArity;
 
     const int numInputs = chromo->numInputs;
@@ -1151,7 +1147,7 @@ DLL_EXPORT void executeChromosome(struct chromosome *chromo, const double *input
     const int numOutputs = chromo->numOutputs;
 
     /* error checking */
-    if (chromo == NULL) {
+    if (chromo == nullptr) {
         printf("Error: cannot execute uninitialised chromosome.\n Terminating CGP-Library.\n");
         exit(0);
     }
@@ -1180,10 +1176,10 @@ DLL_EXPORT void executeChromosome(struct chromosome *chromo, const double *input
         }
 
         /* get the functionality of the active node under evaluation */
-        currentActiveNodeFuction = chromo->nodes[currentActiveNode]->function;
+        currentActiveNodeFunction = chromo->nodes[currentActiveNode]->function;
 
         /* calculate the output of the active node under evaluation */
-        chromo->nodes[currentActiveNode]->output = chromo->funcSet->functions[currentActiveNodeFuction](nodeArity, chromo->nodeInputsHold, chromo->nodes[currentActiveNode]->weights);
+        chromo->nodes[currentActiveNode]->output = chromo->funcSet->functions[currentActiveNodeFunction](nodeArity, chromo->nodeInputsHold, chromo->nodes[currentActiveNode]->weights);
 
 
         /* deal with doubles becoming NAN */
@@ -1221,7 +1217,7 @@ DLL_EXPORT void executeChromosome(struct chromosome *chromo, const double *input
 */
 DLL_EXPORT double getChromosomeOutput(struct chromosome *chromo, int output) {
 
-    if (output < 0 || output > chromo->numOutputs) {
+    if (output < 0 or output > chromo->numOutputs) {
         printf("Error: output less than or greater than the number of chromosome outputs. Called from getChromosomeOutput.\n");
         exit(0);
     }
@@ -1236,7 +1232,7 @@ DLL_EXPORT double getChromosomeOutput(struct chromosome *chromo, int output) {
     has been called
 */
 DLL_EXPORT double getChromosomeNodeValue(struct chromosome *chromo, int node) {
-    if (node < 0 || node > chromo->numNodes) {
+    if (node < 0 or node > chromo->numNodes) {
         printf("Error: node less than or greater than the number of nodes  in chromosome. Called from getChromosomeNodeValue.\n");
         exit(0);
     }
@@ -1250,7 +1246,7 @@ DLL_EXPORT double getChromosomeNodeValue(struct chromosome *chromo, int node) {
 */
 DLL_EXPORT int isNodeActive(struct chromosome *chromo, int node) {
 
-    if (node < 0 || node > chromo->numNodes) {
+    if (node < 0 or node > chromo->numNodes) {
         printf("Error: node less than or greater than the number of nodes  in chromosome. Called from isNodeActive.\n");
         exit(0);
     }
@@ -1282,7 +1278,7 @@ DLL_EXPORT void saveChromosome(struct chromosome *chromo, char const *fileName) 
     fprintf(fp, "numOutputs,%d\n", chromo->numOutputs);
     fprintf(fp, "arity,%d\n", chromo->arity);
 
-    fprintf(fp, "fuctionSet");
+    fprintf(fp, "functionSet");
 
     for (i = 0; i < chromo->funcSet->numFunctions; i++) {
         fprintf(fp, ",%s", chromo->funcSet->functionNames[i]);
@@ -1532,7 +1528,7 @@ static void saveChromosomeLatexRecursive(struct chromosome *chromo, int index, F
                     saveChromosomeLatexRecursive(chromo, chromo->nodes[index - chromo->numInputs]->inputs[i], fp);
                     fprintf(fp, "}{");
                 }
-                else if (i + 1 == getChromosomeNodeArity(chromo, index - chromo->numInputs) && getChromosomeNodeArity(chromo, index - chromo->numInputs) > 2) {
+                else if (i + 1 == getChromosomeNodeArity(chromo, index - chromo->numInputs) and getChromosomeNodeArity(chromo, index - chromo->numInputs) > 2) {
                     saveChromosomeLatexRecursive(chromo, chromo->nodes[index - chromo->numInputs]->inputs[i], fp);
                     fprintf(fp, "}}");
                 }
@@ -1674,6 +1670,275 @@ static void saveChromosomeLatexRecursive(struct chromosome *chromo, int index, F
     }
 
 }
+
+DLL_EXPORT int compareChromosomes(struct chromosome *chromoA, struct chromosome *chromoB) {
+
+    int i, j;
+
+    /* ensure that the chromosomes don't point to NULL */
+    if (chromoA == NULL or chromoB == NULL) {
+        return 0;
+    }
+
+    /* Check the high level parameters */
+    if (chromoA->numInputs != chromoB->numInputs) {
+        return 0;
+    }
+
+    if (chromoA->numNodes != chromoB->numNodes) {
+        return 0;
+    }
+
+    if (chromoA->numOutputs != chromoB->numOutputs) {
+        return 0;
+    }
+
+    if (chromoA->arity != chromoB->arity) {
+        return 0;
+    }
+
+    /* for each node*/
+    for (i = 0; i < chromoA->numNodes; i++) {
+
+        /* Check the function genes */
+        if (chromoA->nodes[i]->function != chromoB->nodes[i]->function) {
+            return 0;
+        }
+
+        /* for each node input */
+        for (j = 0; j < chromoA->arity; j++) {
+
+            /* Check the node inputs */
+            if (chromoA->nodes[i]->inputs[j] != chromoB->nodes[i]->inputs[j]) {
+                return 0;
+            }
+        }
+    }
+
+    /* for all of the outputs */
+    for (i = 0; i < chromoA->numOutputs; i++) {
+
+        /* Check the outputs */
+        if (chromoA->outputNodes[i] != chromoB->outputNodes[i] ) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+
+DLL_EXPORT int compareChromosomesANN(struct chromosome *chromoA, struct chromosome *chromoB) {
+
+    int i, j;
+
+    /* ensure that the chromosomes don't point to NULL */
+    if (chromoA == NULL or chromoB == NULL) {
+        return 0;
+    }
+
+    /* Check the high level parameters */
+    if (chromoA->numInputs != chromoB->numInputs) {
+        return 0;
+    }
+
+    if (chromoA->numNodes != chromoB->numNodes) {
+        return 0;
+    }
+
+    if (chromoA->numOutputs != chromoB->numOutputs) {
+        return 0;
+    }
+
+    if (chromoA->arity != chromoB->arity) {
+        return 0;
+    }
+
+    /* for each node*/
+    for (i = 0; i < chromoA->numNodes; i++) {
+
+        /* Check the function genes */
+        if (chromoA->nodes[i]->function != chromoB->nodes[i]->function) {
+            return 0;
+        }
+
+        /* for each node input */
+        for (j = 0; j < chromoA->arity; j++) {
+
+            /* Check the node inputs */
+            if (chromoA->nodes[i]->inputs[j] != chromoB->nodes[i]->inputs[j]) {
+                return 0;
+            }
+
+            /* Check the connection weights inputs */
+            if (chromoA->nodes[i]->weights[j] != chromoB->nodes[i]->weights[j]) {
+                return 0;
+            }
+        }
+    }
+
+    /* for all of the outputs */
+    for (i = 0; i < chromoA->numOutputs; i++) {
+
+        /* Check the outputs */
+        if (chromoA->outputNodes[i] != chromoB->outputNodes[i] ) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+
+
+
+
+
+DLL_EXPORT int compareChromosomesActiveNodes(struct chromosome *chromoA, struct chromosome *chromoB) {
+
+    int i, j;
+
+    /* ensure that the chromosomes don't point to NULL */
+    if (chromoA == NULL or chromoB == NULL) {
+        return 0;
+    }
+
+    /* Check the high level parameters */
+    if (chromoA->numInputs != chromoB->numInputs) {
+        return 0;
+    }
+
+    if (chromoA->numNodes != chromoB->numNodes) {
+        return 0;
+    }
+
+    if (chromoA->numOutputs != chromoB->numOutputs) {
+        return 0;
+    }
+
+    if (chromoA->arity != chromoB->arity) {
+        return 0;
+    }
+
+    /* for each node*/
+    for (i = 0; i < chromoA->numNodes; i++) {
+
+        /* if the node is active in both chromosomes */
+        if (chromoA->nodes[i]->active == 1 and chromoB->nodes[i]->active == 1) {
+
+            /* Check the function genes */
+            if (chromoA->nodes[i]->function != chromoB->nodes[i]->function) {
+                return 0;
+            }
+
+            /* for each node input */
+            for (j = 0; j < chromoA->arity; j++) {
+
+                /* Check the node inputs */
+                if (chromoA->nodes[i]->inputs[j] != chromoB->nodes[i]->inputs[j]) {
+                    return 0;
+                }
+
+                /* Check the connection weights inputs */
+                if (chromoA->nodes[i]->weights[j] != chromoB->nodes[i]->weights[j]) {
+                    return 0;
+                }
+            }
+        }
+        /* if the node is active in one chromosome */
+        else if (chromoA->nodes[i]->active != chromoB->nodes[i]->active ) {
+            return 0;
+        }
+
+        /* The node is inactive in both chromosomes */
+        else {
+            /* do nothing */
+        }
+    }
+
+    /* for all of the outputs */
+    for (i = 0; i < chromoA->numOutputs; i++) {
+
+        /* Check the outputs */
+        if (chromoA->outputNodes[i] != chromoB->outputNodes[i] ) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+
+DLL_EXPORT int compareChromosomesActiveNodesANN(struct chromosome *chromoA, struct chromosome *chromoB) {
+
+    int i, j;
+
+    /* ensure that the chromosomes don't point to NULL */
+    if (chromoA == NULL or chromoB == NULL) {
+        return 0;
+    }
+
+    /* Check the high level parameters */
+    if (chromoA->numInputs != chromoB->numInputs) {
+        return 0;
+    }
+
+    if (chromoA->numNodes != chromoB->numNodes) {
+        return 0;
+    }
+
+    if (chromoA->numOutputs != chromoB->numOutputs) {
+        return 0;
+    }
+
+    if (chromoA->arity != chromoB->arity) {
+        return 0;
+    }
+
+    /* for each node*/
+    for (i = 0; i < chromoA->numNodes; i++) {
+
+        /* if the node is active in both chromosomes */
+        if (chromoA->nodes[i]->active == 1 and chromoB->nodes[i]->active == 1) {
+
+            /* Check the function genes */
+            if (chromoA->nodes[i]->function != chromoB->nodes[i]->function) {
+                return 0;
+            }
+
+            /* for each node input */
+            for (j = 0; j < chromoA->arity; j++) {
+
+                /* Check the node inputs */
+                if (chromoA->nodes[i]->inputs[j] != chromoB->nodes[i]->inputs[j]) {
+                    return 0;
+                }
+            }
+        }
+        /* if the node is active in one chromosome */
+        else if (chromoA->nodes[i]->active != chromoB->nodes[i]->active ) {
+            return 0;
+        }
+
+        /* The node is inactive in both chromosomes */
+        else {
+            /* do nothing */
+        }
+    }
+
+    /* for all of the outputs */
+    for (i = 0; i < chromoA->numOutputs; i++) {
+
+        /* Check the outputs */
+        if (chromoA->outputNodes[i] != chromoB->outputNodes[i] ) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+
 
 
 /*
@@ -1821,8 +2086,8 @@ DLL_EXPORT void copyChromosome(struct chromosome *chromoDest, struct chromosome 
         chromoDest->activeNodes[i] = chromoSrc->activeNodes[i];
     }
 
-    /* copy fuctionset */
-    copyFuctionSet(chromoDest->funcSet, chromoSrc->funcSet);
+    /* copy functionset */
+    copyFunctionSet(chromoDest->funcSet, chromoSrc->funcSet);
 
     /* copy each of the chromosomes outputs */
     for (i = 0; i < chromoSrc->numOutputs; i++) {
@@ -2026,19 +2291,19 @@ DLL_EXPORT struct dataSet *initialiseDataSetFromArrays(int numInputs, int numOut
     struct dataSet *data;
 
     /* initialise memory for data structure */
-    data = (struct dataSet*)malloc(sizeof(struct dataSet));
+    data = (struct dataSet*)std::malloc(sizeof(struct dataSet));
 
     data->numInputs = numInputs;
     data->numOutputs = numOutputs;
     data->numSamples = numSamples;
 
-    data->inputData = (double**)malloc(data->numSamples * sizeof(double*));
-    data->outputData = (double**)malloc(data->numSamples * sizeof(double*));
+    data->inputData = (double**)std::malloc(data->numSamples * sizeof(double*));
+    data->outputData = (double**)std::malloc(data->numSamples * sizeof(double*));
 
     for (i = 0; i < data->numSamples; i++) {
 
-        data->inputData[i] = (double*)malloc(data->numInputs * sizeof(double));
-        data->outputData[i] = (double*)malloc(data->numOutputs * sizeof(double));
+        data->inputData[i] = (double*)std::malloc(data->numInputs * sizeof(double));
+        data->outputData[i] = (double*)std::malloc(data->numOutputs * sizeof(double));
 
         for (j = 0; j < data->numInputs; j++) {
             data->inputData[i][j] = inputs[(i * data->numInputs) + j];
@@ -2076,7 +2341,7 @@ DLL_EXPORT struct dataSet *initialiseDataSetFromFile(char const *file) {
     }
 
     /* initialise memory for data structure */
-    data = (struct dataSet*)malloc(sizeof(struct dataSet));
+    data = (struct dataSet*)std::malloc(sizeof(struct dataSet));
 
     /* for every line in the given file */
     while ( (line = fgets(buffer, sizeof(buffer), fp)) != NULL) {
@@ -2086,12 +2351,12 @@ DLL_EXPORT struct dataSet *initialiseDataSetFromFile(char const *file) {
 
             sscanf(line, "%d,%d,%d", &(data->numInputs), &(data->numOutputs), &(data->numSamples));
 
-            data->inputData = (double**)malloc(data->numSamples * sizeof(double*));
-            data->outputData = (double**)malloc(data->numSamples * sizeof(double*));
+            data->inputData = (double**)std::malloc(data->numSamples * sizeof(double*));
+            data->outputData = (double**)std::malloc(data->numSamples * sizeof(double*));
 
             for (i = 0; i < data->numSamples; i++) {
-                data->inputData[i] = (double*)malloc(data->numInputs * sizeof(double));
-                data->outputData[i] = (double*)malloc(data->numOutputs * sizeof(double));
+                data->inputData[i] = (double*)std::malloc(data->numInputs * sizeof(double));
+                data->outputData[i] = (double*)std::malloc(data->numOutputs * sizeof(double));
             }
         }
         /* the other lines contain input output pairs */
@@ -2293,8 +2558,8 @@ struct results* initialiseResults(struct parameters *params, int numRuns) {
 
     struct results *rels;
 
-    rels = (struct results*)malloc(sizeof(struct results));
-    rels->bestChromosomes = (struct chromosome**)malloc(numRuns * sizeof(struct chromosome*));
+    rels = (struct results*)std::malloc(sizeof(struct results));
+    rels->bestChromosomes = (struct chromosome**)std::malloc(numRuns * sizeof(struct chromosome*));
 
     rels->numRuns = numRuns;
 
@@ -2406,7 +2671,7 @@ DLL_EXPORT double getMedianActiveNodes(struct results *rels) {
     int i;
     double medActiveNodes = 0;
 
-    int *array = (int*)malloc(getNumChromosomes(rels) * sizeof(int));
+    int *array = (int*)std::malloc(getNumChromosomes(rels) * sizeof(int));
 
     for (i = 0; i < getNumChromosomes(rels); i++) {
         array[i] = getNumChromosomeActiveNodes(rels->bestChromosomes[i]);
@@ -2423,7 +2688,7 @@ DLL_EXPORT double getMedianActiveNodes(struct results *rels) {
 static double medianInt(const int *anArray, const int length) {
 
     int i;
-    int *copyArray = (int*)malloc(length * sizeof(int));
+    int *copyArray = (int*)std::malloc(length * sizeof(int));
     double median;
 
     /* make a copy of the array */
@@ -2452,7 +2717,7 @@ static double medianInt(const int *anArray, const int length) {
 static double medianDouble(const double *anArray, const int length) {
 
     int i;
-    double *copyArray = (double*)malloc(length * sizeof(double));
+    double *copyArray = (double*)std::malloc(length * sizeof(double));
     double median;
 
     /* make a copy of the array */
@@ -2513,7 +2778,7 @@ DLL_EXPORT double getMedianFitness(struct results *rels) {
     int i;
     double med = 0;
 
-    double *array = (double*)malloc(getNumChromosomes(rels) * sizeof(double));
+    double *array = (double*)std::malloc(getNumChromosomes(rels) * sizeof(double));
 
     for (i = 0; i < getNumChromosomes(rels); i++) {
         array[i] = getChromosomeFitness(rels->bestChromosomes[i]);
@@ -2558,7 +2823,7 @@ DLL_EXPORT double getMedianGenerations(struct results *rels) {
     int i;
     double med = 0;
 
-    int *array = (int*)malloc(getNumChromosomes(rels) * sizeof(int));
+    int *array = (int*)std::malloc(getNumChromosomes(rels) * sizeof(int));
 
     for (i = 0; i < getNumChromosomes(rels); i++) {
         array[i] = getChromosomeGenerations(rels->bestChromosomes[i]);
@@ -2791,7 +3056,7 @@ static void singleMutation(struct parameters *params, struct chromosome *chromo)
 
             newGeneValue = chromo->nodes[nodeIndex]->function;
 
-            if ((previousGeneValue != newGeneValue) && (chromo->nodes[nodeIndex]->active == 1)) {
+            if ((previousGeneValue != newGeneValue) and (chromo->nodes[nodeIndex]->active == 1)) {
                 mutatedActive = 1;
             }
 
@@ -2809,7 +3074,7 @@ static void singleMutation(struct parameters *params, struct chromosome *chromo)
 
             newGeneValue = chromo->nodes[nodeIndex]->inputs[nodeInputIndex];
 
-            if ((previousGeneValue != newGeneValue) && (chromo->nodes[nodeIndex]->active == 1)) {
+            if ((previousGeneValue != newGeneValue) and (chromo->nodes[nodeIndex]->active == 1)) {
                 mutatedActive = 1;
             }
         }
@@ -2925,7 +3190,7 @@ static void probabilisticMutationOnlyActive(struct parameters *params, struct ch
     Sets the random number seed
 */
 DLL_EXPORT void setRandomNumberSeed(unsigned int seed) {
-    rgen.seed(seed);
+    srand(seed);
 }
 
 
@@ -2989,27 +3254,27 @@ DLL_EXPORT struct chromosome* runCGP(struct parameters *params, struct dataSet *
         exit(0);
     }
 
-    if (data != NULL && params->numInputs != data->numInputs) {
+    if (data != NULL and params->numInputs != data->numInputs) {
         printf("Error: The number of inputs specified in the dataSet (%d) does not match the number of inputs specified in the parameters (%d).\n", data->numInputs, params->numInputs);
         printf("Terminating CGP-Library.\n");
         exit(0);
     }
 
-    if (data != NULL && params->numOutputs != data->numOutputs) {
+    if (data != NULL and params->numOutputs != data->numOutputs) {
         printf("Error: The number of outputs specified in the dataSet (%d) does not match the number of outputs specified in the parameters (%d).\n", data->numOutputs, params->numOutputs);
         printf("Terminating CGP-Library.\n");
         exit(0);
     }
 
     /* initialise parent chromosomes */
-    parentChromos = (struct chromosome**)malloc(params->mu * sizeof(struct chromosome*));
+    parentChromos = (struct chromosome**)std::malloc(params->mu * sizeof(struct chromosome*));
 
     for (i = 0; i < params->mu; i++) {
         parentChromos[i] = initialiseChromosome(params);
     }
 
     /* initialise children chromosomes */
-    childrenChromos = (struct chromosome**)malloc(params->lambda * sizeof(struct chromosome*));
+    childrenChromos = (struct chromosome**)std::malloc(params->lambda * sizeof(struct chromosome*));
 
     for (i = 0; i < params->lambda; i++) {
         childrenChromos[i] = initialiseChromosome(params);
@@ -3031,7 +3296,7 @@ DLL_EXPORT struct chromosome* runCGP(struct parameters *params, struct dataSet *
     }
 
     /* initialise the candidateChromos */
-    candidateChromos = (struct chromosome**)malloc(numCandidateChromos * sizeof(struct chromosome*));
+    candidateChromos = (struct chromosome**)std::malloc(numCandidateChromos * sizeof(struct chromosome*));
 
     for (i = 0; i < numCandidateChromos; i++) {
         candidateChromos[i] = initialiseChromosome(params);
@@ -3071,7 +3336,7 @@ DLL_EXPORT struct chromosome* runCGP(struct parameters *params, struct dataSet *
         }
 
         /* display progress to the user at the update frequency specified */
-        if (params->updateFrequency != 0 && (gen % params->updateFrequency == 0 || gen >= numGens - 1) ) {
+        if (params->updateFrequency != 0 and (gen % params->updateFrequency == 0 or gen >= numGens - 1) ) {
             printf("%d\t%f\n", gen, bestChromo->fitness);
         }
 
@@ -3175,7 +3440,7 @@ static void getBestChromosome(struct chromosome **parents, struct chromosome **c
 /*
     copies the contents of funcSetSrc to funcSetDest
 */
-static void copyFuctionSet(struct functionSet *funcSetDest, struct functionSet *funcSetSrc) {
+static void copyFunctionSet(struct functionSet *funcSetDest, struct functionSet *funcSetSrc) {
 
     int i;
 
@@ -3190,7 +3455,7 @@ static void copyFuctionSet(struct functionSet *funcSetDest, struct functionSet *
 
 
 /*
-    copys the contents for the src node into dest node.
+    copys the contents from the src node into dest node.
 */
 static void copyNode(struct node *nodeDest, struct node *nodeSrc) {
 
@@ -3266,11 +3531,11 @@ static struct node *initialiseNode(int numInputs, int numNodes, int arity, int n
     int i;
 
     /* allocate memory for node */
-    n = (struct node*)malloc(sizeof(struct node));
+    n = (struct node*)std::malloc(sizeof(struct node));
 
     /* allocate memory for the node's inputs and connection weights */
-    n->inputs = (int*)malloc(arity * sizeof(int));
-    n->weights = (double*)malloc(arity * sizeof(double));
+    n->inputs = (int*)std::malloc(arity * sizeof(int));
+    n->weights = (double*)std::malloc(arity * sizeof(double));
 
     /* set the node's function */
     n->function = getRandomFunction(numFunctions);
@@ -3297,13 +3562,17 @@ static struct node *initialiseNode(int numInputs, int numNodes, int arity, int n
 /*
     Free memory associated with given node
 */
-static void freeNode(struct node *n) noexcept {
+static void freeNode(struct node *n) {
+
     /* attempt to prevent user double freeing */
-    if ( n ) {
-        free ( n->inputs );
-        free ( n->weights );
-        free ( n );
+    if (n == NULL) {
+        printf("Warning: double freeing of node prevented.\n");
+        return;
     }
+
+    free(n->inputs);
+    free(n->weights);
+    free(n);
 }
 
 /*
@@ -3316,20 +3585,24 @@ static double getRandomConnectionWeight(double weightRange) noexcept {
 /*
     returns a random function index
 */
-static int getRandomFunction(int numFunctions) noexcept {
+static int getRandomFunction(int numFunctions) {
+
     /* check that funcSet contains functions */
     if (numFunctions < 1) {
-        printf("Error: cannot assign the function gene a value as the Fuction Set is empty.\nTerminating CGP-Library.\n");
-        std::abort ( );
+        printf("Error: cannot assign the function gene a value as the Function Set is empty.\nTerminating CGP-Library.\n");
+        exit(0);
     }
+
     return randInt(numFunctions);
 }
 
 /*
     returns a random input for the given node
 */
-static int getRandomNodeInput(int numChromoInputs, int numNodes, int nodePosition, double recurrentConnectionProbability) noexcept {
+static int getRandomNodeInput(int numChromoInputs, int numNodes, int nodePosition, double recurrentConnectionProbability) {
+
     int input;
+
     /* pick any ahdead nodes or the node itself */
     if (randDecimal() < recurrentConnectionProbability) {
         input = randInt(numNodes - nodePosition) + nodePosition + numChromoInputs;
@@ -3338,6 +3611,7 @@ static int getRandomNodeInput(int numChromoInputs, int numNodes, int nodePositio
     else {
         input = randInt(numChromoInputs + nodePosition);
     }
+
     return input;
 }
 
@@ -3345,12 +3619,16 @@ static int getRandomNodeInput(int numChromoInputs, int numNodes, int nodePositio
 /*
     returns a random chromosome output
 */
-static int getRandomChromosomeOutput(int numInputs, int numNodes, int shortcutConnections) noexcept {
+static int getRandomChromosomeOutput(int numInputs, int numNodes, int shortcutConnections) {
+
     int output;
+
     if ( shortcutConnections == 1)
         output = randInt(numInputs + numNodes);
     else
         output = randInt(numNodes) + numInputs;
+
+
     return output;
 }
 
@@ -3359,11 +3637,14 @@ static int getRandomChromosomeOutput(int numInputs, int numNodes, int shortcutCo
     Node function add. Returns the sum of all the inputs.
 */
 static double _add(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     int i;
     double sum = inputs[0];
+
     for (i = 1; i < numInputs; i++) {
         sum += inputs[i];
     }
+
     return sum;
 }
 
@@ -3371,11 +3652,14 @@ static double _add(const int numInputs, const double *inputs, const double *conn
     Node function sub. Returns the first input minus all remaining inputs.
 */
 static double _sub(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     int i;
     double sum = inputs[0];
+
     for (i = 1; i < numInputs; i++) {
         sum -= inputs[i];
     }
+
     return sum;
 }
 
@@ -3384,11 +3668,14 @@ static double _sub(const int numInputs, const double *inputs, const double *conn
     Node function mul. Returns the multiplication of all the inputs.
 */
 static double _mul(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     int i;
     double multiplication = inputs[0];
+
     for (i = 1; i < numInputs; i++) {
         multiplication *= inputs[i];
     }
+
     return multiplication;
 }
 
@@ -3397,11 +3684,14 @@ static double _mul(const int numInputs, const double *inputs, const double *conn
     Node function div. Returns the first input divided by the second input divided by the third input etc
 */
 static double _divide(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     int i;
     double divide = inputs[0];
+
     for (i = 1; i < numInputs; i++) {
         divide /= inputs[i];
     }
+
     return divide;
 }
 
@@ -3410,7 +3700,8 @@ static double _divide(const int numInputs, const double *inputs, const double *c
     Node function abs. Returns the absolute of the first input
 */
 static double _absolute(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    return fabs(inputs[0]);
+
+    return std::abs(inputs[0]);
 }
 
 
@@ -3418,7 +3709,8 @@ static double _absolute(const int numInputs, const double *inputs, const double 
     Node function sqrt.  Returns the square root of the first input
 */
 static double _squareRoot(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    return sqrt(inputs[0]);
+
+    return std::sqrt(inputs[0]);
 }
 
 
@@ -3426,7 +3718,8 @@ static double _squareRoot(const int numInputs, const double *inputs, const doubl
     Node function squ.  Returns the square of the first input
 */
 static double _square(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    return pow(inputs[0], 2);
+
+    return std::pow(inputs[0], 2);
 }
 
 
@@ -3434,7 +3727,8 @@ static double _square(const int numInputs, const double *inputs, const double *c
     Node function cub.  Returns the cube of the first input
 */
 static double _cube(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    return pow(inputs[0], 3);
+
+    return std::pow(inputs[0], 3);
 }
 
 
@@ -3442,14 +3736,16 @@ static double _cube(const int numInputs, const double *inputs, const double *con
     Node function power.  Returns the first output to the power of the second
 */
 static double _power(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    return pow(inputs[0], inputs[1]);
+
+    return std::pow(inputs[0], inputs[1]);
 }
 
 /*
     Node function exp.  Returns the exponential of the first input
 */
 static double _exponential(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    return exp(inputs[0]);
+
+    return std::exp(inputs[0]);
 }
 
 
@@ -3457,23 +3753,32 @@ static double _exponential(const int numInputs, const double *inputs, const doub
     Node function sin.  Returns the sine of the first input
 */
 static double _sine(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    return sin(inputs[0]);
+
+    return std::sin(inputs[0]);
 }
 
 /*
     Node function cos.  Returns the cosine of the first input
 */
 static double _cosine(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    return cos(inputs[0]);
+
+    return std::cos(inputs[0]);
 }
 
 /*
     Node function tan.  Returns the tangent of the first input
 */
 static double _tangent(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    return tan(inputs[0]);
+
+    return std::tan(inputs[0]);
 }
 
+/*
+    Node function one.  Always returns 1
+*/
+static double _constTwo ( const int numInputs, const double *inputs, const double *connectionWeights ) noexcept {
+    return 2.0;
+}
 
 /*
     Node function one.  Always returns 1
@@ -3509,13 +3814,17 @@ static double _randFloat(const int numInputs, const double *inputs, const double
     else, '0'
 */
 static double _and(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     int i;
+
     for (i = 0; i < numInputs; i++) {
-        if (inputs[i] == 0) {
-            return 0;
+
+        if (inputs[i] == 0.0) {
+            return 0.0;
         }
     }
-    return 1;
+
+    return 1.0;
 }
 
 /*
@@ -3523,13 +3832,17 @@ static double _and(const int numInputs, const double *inputs, const double *conn
     else, '1'
 */
 static double _nand(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     int i;
+
     for (i = 0; i < numInputs; i++) {
-        if (inputs[i] == 0) {
-            return 1;
+
+        if (inputs[i] == 0.0) {
+            return 1.0;
         }
     }
-    return 0;
+
+    return 0.0;
 }
 
 
@@ -3538,13 +3851,17 @@ static double _nand(const int numInputs, const double *inputs, const double *con
     else, '1'
 */
 static double _or(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     int i;
+
     for (i = 0; i < numInputs; i++) {
-        if (inputs[i] == 1) {
-            return 1;
+
+        if (inputs[i] == 1.0) {
+            return 1.0;
         }
     }
-    return 0;
+
+    return 0.0;
 }
 
 
@@ -3553,13 +3870,17 @@ static double _or(const int numInputs, const double *inputs, const double *conne
     else, '0'
 */
 static double _nor(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     int i;
+
     for (i = 0; i < numInputs; i++) {
-        if (inputs[i] == 1) {
-            return 0;
+
+        if (inputs[i] == 1.0) {
+            return 0.0;
         }
     }
-    return 1;
+
+    return 1.0;
 }
 
 
@@ -3568,24 +3889,23 @@ static double _nor(const int numInputs, const double *inputs, const double *conn
     else, '0'. AKA 'one hot'.
 */
 static double _xor(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     int i;
     int numOnes = 0;
     int out;
+
     for (i = 0; i < numInputs; i++) {
+
         if (inputs[i] == 1) {
             numOnes++;
         }
+
         if (numOnes > 1) {
             break;
         }
     }
-    if (numOnes == 1) {
-        out = 1;
-    }
-    else {
-        out = 0;
-    }
-    return out;
+
+    return numOnes == 1;
 }
 
 /*
@@ -3593,38 +3913,30 @@ static double _xor(const int numInputs, const double *inputs, const double *conn
     else, '1'.
 */
 static double _xnor(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     int i;
     int numOnes = 0;
-    int out;
+
     for (i = 0; i < numInputs; i++) {
+
         if (inputs[i] == 1) {
             numOnes++;
         }
+
         if (numOnes > 1) {
             break;
         }
     }
-    if (numOnes == 1) {
-        out = 0;
-    }
-    else {
-        out = 1;
-    }
-    return out;
+
+    return numOnes != 1;
 }
 
 /*
     Node function not. logical NOT, returns '1' if first input is '0', else '1'
 */
 static double _not(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    double out;
-    if (inputs[0] == 0) {
-        out = 1;
-    }
-    else {
-        out = 0;
-    }
-    return out;
+
+    return inputs [ 0 ] == 0.0;
 }
 
 
@@ -3632,9 +3944,8 @@ static double _not(const int numInputs, const double *inputs, const double *conn
     Node function wire. simply acts as a wire returning the first input
 */
 static double _wire(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    double out;
-    out = inputs[0];
-    return out;
+
+    return inputs[0];
 }
 
 
@@ -3644,10 +3955,14 @@ static double _wire(const int numInputs, const double *inputs, const double *con
     range: [0,1]
 */
 static double _sigmoid(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     double weightedInputSum;
     double out;
+
     weightedInputSum = sumWeigtedInputs(numInputs, inputs, connectionWeights);
-    out = 1.0 / (1.0 + exp(-weightedInputSum));
+
+    out = 1 / (1 + exp(-weightedInputSum));
+
     return out;
 }
 
@@ -3656,12 +3971,17 @@ static double _sigmoid(const int numInputs, const double *inputs, const double *
     range: [0,1]
 */
 static double _gaussian(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     double weightedInputSum;
     double out;
+
     int centre = 0;
     int width = 1;
+
     weightedInputSum = sumWeigtedInputs(numInputs, inputs, connectionWeights);
-    out = exp(-(pow(weightedInputSum - centre, 2.0)) / (2.0 * pow(width, 2.0)));
+
+    out = exp(-(pow(weightedInputSum - centre, 2)) / (2 * pow(width, 2)));
+
     return out;
 }
 
@@ -3671,16 +3991,8 @@ static double _gaussian(const int numInputs, const double *inputs, const double 
     range: [0,1]
 */
 static double _step(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
-    double weightedInputSum;
-    double out;
-    weightedInputSum = sumWeigtedInputs(numInputs, inputs, connectionWeights);
-    if (weightedInputSum < 0.0) {
-        out = 0.0;
-    }
-    else {
-        out = 1.0;
-    }
-    return out;
+
+    return sumWeigtedInputs(numInputs, inputs, connectionWeights) >= 0.0;
 }
 
 
@@ -3689,10 +4001,14 @@ static double _step(const int numInputs, const double *inputs, const double *con
     range: [-1,1]
 */
 static double _softsign(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     double weightedInputSum;
     double out;
+
     weightedInputSum = sumWeigtedInputs(numInputs, inputs, connectionWeights);
+
     out = weightedInputSum / (1.0 + fabs(weightedInputSum));
+
     return out;
 }
 
@@ -3702,10 +4018,14 @@ static double _softsign(const int numInputs, const double *inputs, const double 
     range: [-1,1]
 */
 static double _hyperbolicTangent(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+
     double weightedInputSum;
     double out;
+
     weightedInputSum = sumWeigtedInputs(numInputs, inputs, connectionWeights);
+
     out = tanh(weightedInputSum);
+
     return out;
 }
 
@@ -3713,43 +4033,57 @@ static double _hyperbolicTangent(const int numInputs, const double *inputs, cons
 /*
     Returns the sum of the weighted inputs.
 */
-static double sumWeigtedInputs(const int numInputs, const double *inputs, const double *connectionWeights) noexcept {
+static double sumWeigtedInputs(const int numInputs, const double *inputs, const double *connectionWeights) {
+
     int i;
-    double weightedSum = 0.0;
+    double weightedSum = 0;
+
     for (i = 0; i < numInputs; i++) {
         weightedSum += (inputs[i] * connectionWeights[i]);
     }
+
     return weightedSum;
 }
+
+
+
 
 
 /*
     The default fitness function used by CGP-Library.
     Simply assigns an error of the sum of the absolute differences between the target and actual outputs for all outputs over all samples
 */
-double supervisedLearning(struct parameters *params, struct chromosome *chromo, struct dataSet *data) noexcept {
+DLL_EXPORT double supervisedLearning(struct parameters *params, struct chromosome *chromo, struct dataSet *data) noexcept {
+
     int i, j;
-    double error = 0.0;
+    double error = 0;
+
     /* error checking */
     if (getNumChromosomeInputs(chromo) != getNumDataSetInputs(data)) {
         printf("Error: the number of chromosome inputs must match the number of inputs specified in the dataSet.\n");
         printf("Terminating CGP-Library.\n");
         exit(0);
     }
+
     if (getNumChromosomeOutputs(chromo) != getNumDataSetOutputs(data)) {
         printf("Error: the number of chromosome outputs must match the number of outputs specified in the dataSet.\n");
         printf("Terminating CGP-Library.\n");
         exit(0);
     }
+
     /* for each sample in data */
     for (i = 0 ; i < getNumDataSetSamples(data); i++) {
+
         /* calculate the chromosome outputs for the set of inputs  */
         executeChromosome(chromo, getDataSetSampleInputs(data, i));
+
         /* for each chromosome output */
         for (j = 0; j < getNumChromosomeOutputs(chromo); j++) {
+
             error += fabs(getChromosomeOutput(chromo, j) - getDataSetSampleOutput(data, i, j));
         }
     }
+
     return error;
 }
 
@@ -3761,41 +4095,39 @@ static double randDecimal() noexcept {
     return std::uniform_real_distribution<> ( 0.0, 1.0 + DBL_EPSILON ) ( rgen );
 }
 
-
-
 /*
     sort int array using qsort
 */
-static void sortIntArray ( int *array, const int length ) {
+static void sortIntArray(int *array, const int length) {
 
-    qsort ( array, length, sizeof ( int ), cmpInt );
+    qsort(array, length, sizeof(int), cmpInt);
 }
 
 /*
     used by qsort in sortIntArray
 */
-static int cmpInt ( const void * a, const void * b ) {
-    return ( *( int* ) a - *( int* ) b );
+static int cmpInt(const void * a, const void * b) {
+    return ( *(int*)a - * (int*)b );
 }
 
 
 /*
     sort double array using qsort
 */
-static void sortDoubleArray ( double *array, const int length ) {
+static void sortDoubleArray(double *array, const int length) {
 
-    qsort ( array, length, sizeof ( double ), cmpDouble );
+    qsort(array, length, sizeof(double), cmpDouble);
 }
 
 /*
     used by qsort in sortDoubleArray
 */
-static int cmpDouble ( const void * a, const void * b ) {
+static int cmpDouble(const void * a, const void * b) {
 
-    if ( *( double* ) a < *( double* ) b ) {
+    if ( *(double*)a < * (double*)b) {
         return -1;
     }
-    if ( *( double* ) a == *( double* ) b ) {
+    if ( *(double*)a == *(double*)b ) {
         return 0;
     }
     else {
@@ -3804,16 +4136,21 @@ static int cmpDouble ( const void * a, const void * b ) {
 }
 
 
+
 /*
     Prints the current functions in the function set to
     the terminal.
 */
 static void printFunctionSet(struct parameters *params) {
+
     int i;
+
     printf("Function Set:");
+
     for (i = 0; i < params->funcSet->numFunctions; i++) {
         printf(" %s", params->funcSet->functionNames[i]);
     }
+
     printf(" (%d)\n", params->funcSet->numFunctions);
 }
 
@@ -3821,6 +4158,6 @@ static void printFunctionSet(struct parameters *params) {
 /*
     random integer [0, n).
 */
-static int randInt(int n) noexcept {
+static int randInt ( int n ) noexcept {
     return std::uniform_int_distribution<int> ( 0, n - 1 ) ( rgen );
 }

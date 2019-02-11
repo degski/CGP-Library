@@ -40,9 +40,6 @@ double radius ( const int numInputs, const double *inputs, const double *connect
 double radius2 ( const int numInputs, const double *inputs, const double *connectionWeights ) noexcept {
     return 6.0;
 }
-double const_two ( const int numInputs, const double *inputs, const double *connectionWeights ) noexcept {
-    return 2.0;
-}
 double int_div ( const int numInputs, const double *inputs, const double *connectionWeights ) noexcept {
     if ( 0 != static_cast<int> ( inputs [ 1 ] ) )
         return static_cast<double> ( static_cast<int> ( inputs [ 0 ] ) % static_cast<int> ( inputs [ 1 ] ) );
@@ -116,10 +113,9 @@ int main ( ) {
     setMu ( params, 1 );
     setLambda ( params, 4 );
 
-    addNodeFunction ( params, "add, sub, mul, abs, 1" );
+    addNodeFunction ( params, "add, sub, mul, abs, 1, 2" );
     addCustomNodeFunction ( params, radius, "rad", 0 );
     addCustomNodeFunction ( params, radius2, "2xrad", 0 );
-    addCustomNodeFunction ( params, const_two, "2", 0 );
     addCustomNodeFunction ( params, int_div, "idiv", 2 );
     addCustomNodeFunction ( params, int_rem, "irem", 2 );
     addCustomNodeFunction ( params, negate, "neg", 1 );

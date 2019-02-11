@@ -18,7 +18,7 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="cgp.cpp">
+    <ClCompile Include="..\src\cgp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -27,7 +27,7 @@
     <None Include="..\README.md" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="cgp.hpp">
+    <ClInclude Include="..\src\cgp.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
