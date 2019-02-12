@@ -46,11 +46,16 @@
 #include <frozen/unordered_map.h>
 #include <frozen/string.h>
 
+#ifdef __GNUC__
 #include "lehmer.hpp"
+#endif
+
 
 namespace cgp {
 
-template<typename ResultType = std::uint64_t>
+namespace splitmix64_detail {
+
+template<typename ResultType>
 class splitmix64 {
 
     public:
@@ -66,8 +71,7 @@ class splitmix64 {
 
     // Seed by default.
     splitmix64 ( ) noexcept :
-        m_state { static_cast<std::uint64_t> ( std::random_device { } ( ) ) << 32 | static_cast<std::uint64_t> ( std::random_device { } ( ) ) } {
-    }
+        m_state { static_cast< std::uint64_t > ( std::random_device { } ( ) ) << 32 | static_cast< std::uint64_t > ( std::random_device { } ( ) ) } { }
 
     splitmix64 ( const std::uint64_t s_ ) noexcept {
         seed ( s_ );
@@ -102,6 +106,9 @@ class splitmix64 {
 
     std::uint64_t m_state;
 };
+} // namepace splitmix64_detail
+
+using splitmix64 = splitmix64_detail::splitmix64<std::uint64_t>;
 
 
 namespace functions {
@@ -383,7 +390,11 @@ struct Parameters {
         rng.seed ( s_ );
     }
 
-    using Rng = mcg128_fast;
+    #ifdef __GNUC__
+        using Rng = mcg128_fast;
+    #else
+        using Rng = splitmix64;
+    #endif
 
     static Rng rng;
 
