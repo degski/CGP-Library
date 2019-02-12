@@ -30,8 +30,12 @@
 #include <iostream>
 #include <random>
 
-#include "cgpcpp17.hpp"
 
+
+#if 1
+
+
+#include "cgpcpp17.hpp"
 
 int main ( ) {
 
@@ -50,7 +54,10 @@ int main ( ) {
 
 
 
-#if 0
+#else
+
+#include "./../src/splitmix.hpp"
+#include "./../src/cgp.hpp"
 
 double radius ( const int numInputs, const double *inputs, const double *connectionWeights ) noexcept {
     return 3.0;

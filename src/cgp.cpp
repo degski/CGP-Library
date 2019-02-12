@@ -24,6 +24,7 @@
 #include <cfloat>
 
 #include <algorithm>
+#include <iostream>
 #include <random>
 
 #include "splitmix.hpp"
@@ -3116,6 +3117,12 @@ static void probabilisticMutation(struct parameters *params, struct chromosome *
 
         /* for every input to each chromosome */
         for (j = 0; j < params->arity; j++) {
+
+
+            if ( chromo->numNodes != params->numNodes )
+                std::cout << "numNodes differ\n";
+            if ( chromo->numInputs != params->numInputs )
+                std::cout << "numInputs differ\n";
 
             /* mutate the node input */
             if (randDecimal() <= params->mutationRate) {
