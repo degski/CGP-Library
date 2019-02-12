@@ -46,6 +46,7 @@
 #include <frozen/unordered_map.h>
 #include <frozen/string.h>
 
+#include "lehmer.hpp"
 
 namespace cgp {
 
@@ -149,10 +150,14 @@ using FunctionPointer = Real ( * ) ( const std::vector<Real> & inputs_, const st
 template<typename Real = float>
 struct FunctionSet {
 
+    private:
+
     struct functionData {
         FunctionPointer<Real> function;
         int maxNumInputs;
     };
+
+    public:
 
     std::vector<frozen::string> functionNames;
     std::vector<FunctionPointer<Real>> functions;
@@ -190,6 +195,8 @@ struct FunctionSet {
             std::cout << ' ' << name.data ( );
         std::cout << " (" << numFunctions << ")\n";
     }
+
+    private:
 
     static constexpr frozen::unordered_map<frozen::string, functionData, 34> function_set {
         { "add", { functions::f_add, -1 } },
@@ -372,11 +379,13 @@ struct Parameters {
         return std::uniform_int_distribution<int> ( 0, n_ - 1 ) ( Parameters::rng );
     }
 
-    void seed_rng ( const std::uint64_t s_ ) noexcept {
+    void seedRng ( const std::uint64_t s_ ) noexcept {
         rng.seed ( s_ );
     }
 
-    static splitmix64<std::uint64_t> rng;
+    using Rng = mcg128_fast;
+
+    static Rng rng;
 
     // Output.
 
@@ -407,7 +416,7 @@ struct Parameters {
 };
 
 template<typename Real>
-splitmix64<std::uint64_t> Parameters<Real>::rng { };
+typename Parameters<Real>::Rng Parameters<Real>::rng { static_cast<std::uint64_t> ( std::random_device { } ( ) ) << 32 | static_cast<std::uint64_t> ( std::random_device { } ( ) ) };
 
 
 template<typename Real>
@@ -503,22 +512,20 @@ struct Chromosome {
     }
 
     // Used by setActiveNodes to recursively search for active nodes.
-    void recursivelySetActiveNodes ( const int nodeIndex_ ) noexcept {
-        // If the given node is an input, stop.
-        if ( nodeIndex_ < numInputs )
-            return;
-        // If the given node has already been flagged as active.
-        if ( nodes [ nodeIndex_ - numInputs ].active )
+    void recursivelySetActiveNodes ( int nodeIndex_ ) noexcept {
+        nodeIndex_ -= numInputs;
+        // If the given node is an input or has already been flagged as active, stop.
+        if ( nodeIndex_ < 0 or nodes [ nodeIndex_ ].active )
             return;
         // Log the node as active.
-        nodes [ nodeIndex_ - numInputs ].active = true;
-        activeNodes [ numActiveNodes ] = nodeIndex_ - numInputs;
+        nodes [ nodeIndex_ ].active = true;
+        activeNodes [ numActiveNodes ] = nodeIndex_;
         ++numActiveNodes;
         // Set the nodes actual arity.
-        nodes [ nodeIndex_ - numInputs ].actArity = getChromosomeNodeArity ( nodeIndex_ - numInputs );
+        nodes [ nodeIndex_ ].actArity = getChromosomeNodeArity ( nodeIndex_ );
         // Recursively log all the nodes to which the current nodes connect as active.
-        for ( int i = 0; i < nodes [ nodeIndex_ - numInputs ].actArity; ++i )
-            recursivelySetActiveNodes ( nodes [ nodeIndex_ - numInputs ].inputs [ i ] );
+        for ( int i = 0; i < nodes [ nodeIndex_ ].actArity; ++i )
+            recursivelySetActiveNodes ( nodes [ nodeIndex_ ].inputs [ i ] );
     }
 
     // Gets the chromosome node arity.
