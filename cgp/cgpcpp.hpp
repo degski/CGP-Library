@@ -56,74 +56,15 @@
 #error funny pointers detected
 #endif
 
-#if M64 and defined ( __GNUC__ )
+#if M64
+#if defined ( __GNUC__ )
 #include "lehmer.hpp"
+#else
+#include "splitmix.hpp"
 #endif
-
+#endif
 
 namespace cgp {
-
-#if M64 and not ( defined ( __GNUC__ ) )
-
-namespace splitmix64_detail {
-
-template<typename ResultType>
-class splitmix64 {
-
-    public:
-
-    using result_type = ResultType;
-
-    static inline constexpr result_type min ( ) noexcept {
-        return std::numeric_limits<result_type>::min ( );
-    }
-    static inline constexpr result_type max ( ) noexcept {
-        return std::numeric_limits<result_type>::max ( );
-    }
-
-    // Seed by default.
-    splitmix64 ( ) noexcept :
-        m_state { static_cast< std::uint64_t > ( std::random_device { } ( ) ) << 32 | static_cast< std::uint64_t > ( std::random_device { } ( ) ) } { }
-
-    splitmix64 ( const std::uint64_t s_ ) noexcept {
-        seed ( s_ );
-    }
-
-    void seed ( const std::uint64_t s_ ) noexcept {
-        m_state = s_;
-    }
-
-    bool operator == ( const splitmix64 & rhs_ ) const noexcept {
-        return m_state == rhs_.m_state;
-    }
-    bool operator != ( const splitmix64 & rhs_ ) const noexcept {
-        return m_state != rhs_.m_state;
-    }
-
-    result_type operator ( ) ( ) noexcept {
-        return hash ( next ( ) );
-    }
-
-    private:
-
-    std::uint64_t next ( ) noexcept {
-        return m_state += std::uint64_t { 0x9E3779B97F4A7C15 };
-    }
-
-    std::uint64_t hash ( std::uint64_t z ) const noexcept {
-        z = ( z ^ ( z >> 30 ) ) * std::uint64_t { 0xBF58476D1CE4E5B9 };
-        z = ( z ^ ( z >> 27 ) ) * std::uint64_t { 0x94D049BB133111EB };
-        return z ^ ( z >> 31 );
-    }
-
-    std::uint64_t m_state;
-};
-} // namepace splitmix64_detail
-
-using splitmix64 = splitmix64_detail::splitmix64<std::uint64_t>;
-
-#endif
-
 
 namespace functions {
 
