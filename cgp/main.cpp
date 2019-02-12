@@ -30,8 +30,27 @@
 #include <iostream>
 #include <random>
 
-#include "./../src/splitmix.hpp"
-#include "./../src/cgp.hpp"
+#include "cgpcpp17.hpp"
+
+
+int main ( ) {
+
+    cgp::FunctionSet<> fs;
+
+
+    return EXIT_SUCCESS;
+}
+
+
+
+
+
+
+
+
+
+
+#if 0
 
 double radius ( const int numInputs, const double *inputs, const double *connectionWeights ) noexcept {
     return 3.0;
@@ -88,7 +107,7 @@ double fitnessWithSizePressure ( struct parameters *params, struct chromosome *c
             saveChromosome ( chromo, "./../data/best.chro" );
         }
     }
-    return svl_fitness + getNumChromosomeActiveNodes ( chromo ) / 24.0;
+    return svl_fitness + getNumChromosomeActiveNodes ( chromo ) / 64.0;
 }
 
 
@@ -99,23 +118,23 @@ int main ( ) {
     struct chromosome *chromo = nullptr;
 
     int numInputs = 2;
-    int numNodes = 24;
+    int numNodes = 32;
     int numOutputs = 1;
     int nodeArity = 2;
 
     int numGens = 100'000'000;
     double targetFitness = 0.0;
-    int updateFrequency = 10'000;
+    int updateFrequency = 1'000;
 
     params = initialiseParameters ( numInputs, numNodes, numOutputs, nodeArity );
 
     setMu ( params, 1 );
-    setLambda ( params, 4 );
+    setLambda ( params, 16 );
 
-    addNodeFunction ( params, "add, sub, mul, abs, 1, 2" );
+    addNodeFunction ( params, "add, mul, abs, 1" );
     addCustomNodeFunction ( params, radius, "rad", 0 );
-    addCustomNodeFunction ( params, radius2, "2xrad", 0 );
-    addCustomNodeFunction ( params, int_div, "idiv", 2 );
+    // addCustomNodeFunction ( params, radius2, "2xrad", 0 );
+    // addCustomNodeFunction ( params, int_div, "idiv", 2 );
     addCustomNodeFunction ( params, int_rem, "irem", 2 );
     addCustomNodeFunction ( params, negate, "neg", 1 );
 
@@ -140,22 +159,41 @@ int main ( ) {
 }
 
 /*
-( 0 ) : input
-( 1 ) : input
-( 2 ) : mul     1 1 *
-( 3 ) : idiv    2 1 *
-( 4 ) : rad *
-( 5 ) : mul     4 3 *
-( 6 ) : idiv    4 5
-( 7 ) : add     0 5 *
-( 8 ) : sub     5 2 *
-( 9 ) : abs     8 *
-( 10 ) : irem    9 5 *
-( 11 ) : idiv    10 8 *
-( 12 ) : sub     7 4 *
-( 13 ) : irem    9 7
-( 14 ) : idiv    7 6
-( 15 ) : sub     5 11 *
-( 16 ) : irem    2 8
-( 17 ) : add     12 15 *
+
+(0):    input
+(1):    input
+(2):    rad     *
+(3):    mul     1 2 *
+(4):    irem    1 3 *
+(5):    mul     2 4 *
+(6):    sub     5 2 *
+(8):    sub     4 2 *
+(9):    abs     8 *
+(11):   add     5 6 *
+(15):   mul     8 9 *
+(16):   irem    15 2 *
+(22):   add     16 0 *
+(23):   add     22 11 *
+outputs: 23
+
+
+(0):    input
+(1):    input
+(2):    add     1 1 *
+(3):    rad     *
+(4):    neg     3 *
+(5):    irem    1 2 *
+(7):    mul     3 5 *
+(9):    add     4 5 *
+(10):   add     0 7 *
+(13):   add     7 4 *
+(15):   abs     9 *
+(16):   mul     9 15 *
+(19):   add     10 13 *
+(20):   irem    16 3 *
+(22):   add     19 20 *
+outputs: 22
+
 */
+
+#endif

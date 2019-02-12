@@ -1288,15 +1288,15 @@ DLL_EXPORT void saveChromosome(struct chromosome *chromo, char const *fileName) 
     /* save the chromosome structure */
     for (i = 0; i < chromo->numNodes; i++) {
 
-        fprintf(fp, "%d\n", chromo->nodes[i]->function);
+        fprintf(fp, "func %d\n", chromo->nodes[i]->function);
 
         for (j = 0; j < chromo->arity; j++) {
-            fprintf(fp, "%d,%f\n", chromo->nodes[i]->inputs[j], chromo->nodes[i]->weights[j]);
+            fprintf(fp, "input %d, weights %f\n", chromo->nodes[i]->inputs[j], chromo->nodes[i]->weights[j]);
         }
     }
 
     for (i = 0; i < chromo->numOutputs; i++) {
-        fprintf(fp, "%d,", chromo->outputNodes[i]);
+        fprintf(fp, "output nodes %d,", chromo->outputNodes[i]);
     }
 
     fclose(fp);
