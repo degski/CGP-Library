@@ -177,7 +177,7 @@ struct FunctionSet {
         { "sin", { functions::f_sine, 1 } },
         { "cos", { functions::f_cosine, 1 } },
         { "tan", { functions::f_tangent, 1 } },
-        { "rand", { functions::f_randFloat,  } },
+        { "rand", { functions::f_randFloat, 0 } },
         { "2", { functions::f_constTwo, 0 } },
         { "1", { functions::f_constOne, 0 } },
         { "0", { functions::f_constZero, 0 } },
