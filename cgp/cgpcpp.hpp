@@ -46,12 +46,24 @@
 #include <frozen/unordered_map.h>
 #include <frozen/string.h>
 
-#ifdef __GNUC__
+#if UINTPTR_MAX == 0xFFFF'FFFF
+#define M32 1
+#define M64 0
+#elif UINTPTR_MAX == 0xFFFF'FFFF'FFFF'FFFF
+#define M32 0
+#define M64 1
+#else
+#error funny pointers detected
+#endif
+
+#if M64 and defined ( __GNUC__ )
 #include "lehmer.hpp"
 #endif
 
 
 namespace cgp {
+
+#if M64 and not ( defined ( __GNUC__ ) )
 
 namespace splitmix64_detail {
 
@@ -109,6 +121,8 @@ class splitmix64 {
 } // namepace splitmix64_detail
 
 using splitmix64 = splitmix64_detail::splitmix64<std::uint64_t>;
+
+#endif
 
 
 namespace functions {
@@ -390,10 +404,14 @@ struct Parameters {
         rng.seed ( s_ );
     }
 
+    #if M64
     #ifdef __GNUC__
         using Rng = mcg128_fast;
     #else
         using Rng = splitmix64;
+    #endif
+    #else
+        using Rng = std::minstd_rand;
     #endif
 
     static Rng rng;
@@ -426,8 +444,13 @@ struct Parameters {
     }
 };
 
+#if M64
 template<typename Real>
 typename Parameters<Real>::Rng Parameters<Real>::rng { static_cast<std::uint64_t> ( std::random_device { } ( ) ) << 32 | static_cast<std::uint64_t> ( std::random_device { } ( ) ) };
+#else
+template<typename Real>
+typename Parameters<Real>::Rng Parameters<Real>::rng { std::random_device { } ( ) };
+#endif
 
 
 template<typename Real>
@@ -888,3 +911,6 @@ template<typename Real> Real f_hyperbolicTangent ( const std::vector<Real> & inp
 
 } // namespace functions
 } // namespace cgp
+
+#undef M64
+#undef M32
