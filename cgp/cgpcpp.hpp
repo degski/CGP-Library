@@ -114,7 +114,7 @@ struct FunctionSet {
 
     private:
 
-    struct functionData {
+    struct FunctionData {
         FunctionPointer<Real> function;
         int maxNumInputs;
     };
@@ -160,7 +160,7 @@ struct FunctionSet {
 
     private:
 
-    static constexpr frozen::unordered_map<frozen::string, functionData, 34> function_set {
+    static constexpr frozen::unordered_map<frozen::string, FunctionData, 34> function_set {
         { "add", { functions::f_add, -1 } },
         { "sub", { functions::f_sub, -1 } },
         { "mul", { functions::f_mul, -1 } },
