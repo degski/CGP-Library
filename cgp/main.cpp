@@ -35,12 +35,15 @@
 #if 1
 
 
-#include "cgpcpp17.hpp"
+#include "cgpcpp.hpp"
 
 int main ( ) {
 
     cgp::FunctionSet<> fs;
 
+    fs.addNodeFunction ( "add", "mul", "sub" );
+
+    fs.print ( );
 
     return EXIT_SUCCESS;
 }

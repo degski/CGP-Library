@@ -217,7 +217,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\cgp.hpp" />
-    <ClInclude Include="cgpcpp17.hpp" />
+    <ClInclude Include="cgpcpp.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

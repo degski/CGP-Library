@@ -30,7 +30,7 @@
     <ClInclude Include="..\src\cgp.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cgpcpp17.hpp">
+    <ClInclude Include="cgpcpp.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
