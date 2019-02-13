@@ -31,9 +31,11 @@
 #include <random>
 
 
+#ifndef nl
+#define nl '\n'
+#endif
 
 #if 1
-
 
 #include "cgpcpp.hpp"
 
@@ -41,9 +43,11 @@ int main ( ) {
 
     cgp::FunctionSet<> fs;
 
-    fs.addNodeFunction ( "add", "mul", "sub" );
+    fs.addNodeFunction ( "add", "mul", "sub", "tanh" );
 
     fs.print ( );
+
+    std::cout << sizeof ( cgp::Node<float> ) << ' ' << sizeof ( cgp::NodeArray<int> ) << ' ' << cgp::FunctionSet<>::sizeBuiltinFunctionSet ( ) << nl;
 
     return EXIT_SUCCESS;
 }
@@ -125,23 +129,23 @@ int main ( ) {
 
     struct parameters *params = nullptr;
     struct dataSet *trainingData = nullptr;
-    struct chromosome *chromo = nullptr;
+
 
     int numInputs = 2;
-    int numNodes = 32;
+    int numNodes = 24;
     int numOutputs = 1;
     int nodeArity = 2;
 
-    int numGens = 100'000'000;
+    int numGens = 20'000'000;
     double targetFitness = 0.0;
     int updateFrequency = 1'000;
 
     params = initialiseParameters ( numInputs, numNodes, numOutputs, nodeArity );
 
     setMu ( params, 1 );
-    setLambda ( params, 16 );
+    setLambda ( params, 4 );
 
-    addNodeFunction ( params, "add, mul, abs, 1" );
+    addNodeFunction ( params, "add, mul, abs, 1, wire" );
     addCustomNodeFunction ( params, radius, "rad", 0 );
     // addCustomNodeFunction ( params, radius2, "2xrad", 0 );
     // addCustomNodeFunction ( params, int_div, "idiv", 2 );
@@ -152,17 +156,23 @@ int main ( ) {
 
     setUpdateFrequency ( params, updateFrequency );
     setCustomFitnessFunction ( params, fitnessWithSizePressure, "fitnessWithSizePressure" );
+    setNumThreads ( params, 20 );
 
     printParameters ( params );
 
     trainingData = initialiseDataSetFromFile ( "./../data/table.data" );
 
-    chromo = runCGP ( params, trainingData, numGens );
+    auto results = repeatCGP ( params, trainingData, numGens, 1 );
 
-    printChromosome ( chromo, 0 );
+    for ( int i = 0; i < 1; ++i ) {
+        struct chromosome * chromo = getChromosome ( results, i );
+        printChromosome ( chromo, 0 );
+        std::cout << nl;
+        freeChromosome ( chromo );
+    }
 
+    freeResults ( results );
     freeDataSet ( trainingData );
-    freeChromosome ( chromo );
     freeParameters ( params );
 
     return EXIT_SUCCESS;

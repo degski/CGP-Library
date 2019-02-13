@@ -40,11 +40,15 @@
 #include <type_traits>
 #include <vector>
 
+#include <absl/container/fixed_array.h>
+#include <absl/container/inlined_vector.h>
+
 #include <cereal/cereal.hpp>
 #include <cereal/archives/binary.hpp>
 
 #include <frozen/unordered_map.h>
 #include <frozen/string.h>
+
 
 #if UINTPTR_MAX == 0xFFFF'FFFF
 #define M32 1
@@ -64,11 +68,20 @@
 #endif
 #endif
 
+#ifndef nl
+#define DEF_NL
+#define nl '\n'
+#endif
+
 namespace cgp {
 
-namespace functions {
+template<typename T>
+using NodeArray = absl::FixedArray<T>;
 
-// Node functions defines in CGP-Library.
+
+namespace function {
+
+// Node function defines in CGP-Library.
 template<typename Real = float> Real f_add ( const std::vector<Real> & inputs_, const std::vector<Real> & connectionWeights_ ) noexcept;
 template<typename Real = float> Real f_sub ( const std::vector<Real> & inputs_, const std::vector<Real> & connectionWeights_ ) noexcept;
 template<typename Real = float> Real f_mul ( const std::vector<Real> & inputs_, const std::vector<Real> & connectionWeights_ ) noexcept;
@@ -122,7 +135,7 @@ struct FunctionSet {
     public:
 
     std::vector<frozen::string> functionNames;
-    std::vector<FunctionPointer<Real>> functions;
+    std::vector<FunctionPointer<Real>> function;
     std::vector<int> maxNumInputs;
 
     int numFunctions = 0;
@@ -139,14 +152,14 @@ struct FunctionSet {
 
     void addCustomNodeFunction ( const frozen::string & functionName_, FunctionPointer<Real> function_, int maxNumInputs_ ) {
         functionNames.push_back ( functionName_ );
-        functions.push_back ( function_ );
+        function.push_back ( function_ );
         maxNumInputs.push_back ( maxNumInputs_ );
         ++numFunctions;
     }
 
     void clear ( ) noexcept {
         functionNames.clear ( );
-        functions.clear ( );
+        function.clear ( );
         maxNumInputs.clear ( );
         numFunctions = 0;
     }
@@ -158,43 +171,47 @@ struct FunctionSet {
         std::cout << " (" << numFunctions << ")\n";
     }
 
+    [[ nodiscard ]] static constexpr std::size_t sizeBuiltinFunctionSet ( ) noexcept {
+        return function_set.size ( );
+    }
+
     private:
 
     static constexpr frozen::unordered_map<frozen::string, FunctionData, 34> function_set {
-        { "add", { functions::f_add, -1 } },
-        { "sub", { functions::f_sub, -1 } },
-        { "mul", { functions::f_mul, -1 } },
-        { "div", { functions::f_divide, -1 } },
-        { "idiv", { functions::f_idiv, 2 } },
-        { "irem", { functions::f_irem, 2 } },
-        { "neg", { functions::f_negate, 1 } },
-        { "abs", { functions::f_absolute, 1 } },
-        { "sqrt", { functions::f_squareRoot, 1 } },
-        { "sq", { functions::f_square, 1 } },
-        { "cube", { functions::f_cube, 1 } },
-        { "pow", { functions::f_power, 2 } },
-        { "exp", { functions::f_exponential, 1 } },
-        { "sin", { functions::f_sine, 1 } },
-        { "cos", { functions::f_cosine, 1 } },
-        { "tan", { functions::f_tangent, 1 } },
-        { "rand", { functions::f_randFloat, 0 } },
-        { "2", { functions::f_constTwo, 0 } },
-        { "1", { functions::f_constOne, 0 } },
-        { "0", { functions::f_constZero, 0 } },
-        { "pi", { functions::f_constPI, 0 } },
-        { "and", { functions::f_and, -1 } },
-        { "nand", { functions::f_nand, -1 } },
-        { "or", { functions::f_or, -1 } },
-        { "nor", { functions::f_nor, -1 } },
-        { "xor", { functions::f_xor, -1 } },
-        { "xnor", { functions::f_xnor, -1 } },
-        { "not", { functions::f_not, 1 } },
-        { "wire", { functions::f_wire, 1 } },
-        { "sig", { functions::f_sigmoid, -1 } },
-        { "gauss", { functions::f_gaussian, -1 } },
-        { "step", { functions::f_step, -1 } },
-        { "soft", { functions::f_softsign, -1 } },
-        { "tanh", { functions::f_hyperbolicTangent, -1 } }
+        { "add", { function::f_add, -1 } },
+        { "sub", { function::f_sub, -1 } },
+        { "mul", { function::f_mul, -1 } },
+        { "div", { function::f_divide, -1 } },
+        { "idiv", { function::f_idiv, 2 } },
+        { "irem", { function::f_irem, 2 } },
+        { "neg", { function::f_negate, 1 } },
+        { "abs", { function::f_absolute, 1 } },
+        { "sqrt", { function::f_squareRoot, 1 } },
+        { "sq", { function::f_square, 1 } },
+        { "cube", { function::f_cube, 1 } },
+        { "pow", { function::f_power, 2 } },
+        { "exp", { function::f_exponential, 1 } },
+        { "sin", { function::f_sine, 1 } },
+        { "cos", { function::f_cosine, 1 } },
+        { "tan", { function::f_tangent, 1 } },
+        { "rand", { function::f_randFloat, 0 } },
+        { "2", { function::f_constTwo, 0 } },
+        { "1", { function::f_constOne, 0 } },
+        { "0", { function::f_constZero, 0 } },
+        { "pi", { function::f_constPI, 0 } },
+        { "and", { function::f_and, -1 } },
+        { "nand", { function::f_nand, -1 } },
+        { "or", { function::f_or, -1 } },
+        { "nor", { function::f_nor, -1 } },
+        { "xor", { function::f_xor, -1 } },
+        { "xnor", { function::f_xnor, -1 } },
+        { "not", { function::f_not, 1 } },
+        { "wire", { function::f_wire, 1 } },
+        { "sig", { function::f_sigmoid, -1 } },
+        { "gauss", { function::f_gaussian, -1 } },
+        { "step", { function::f_step, -1 } },
+        { "soft", { function::f_softsign, -1 } },
+        { "tanh", { function::f_hyperbolicTangent, -1 } }
     };
 };
 
@@ -232,7 +249,9 @@ struct Parameters {
     int mu;
     int lambda;
     char evolutionaryStrategy;
+    private:
     Real mutationRate;
+    public:
     std::bernoulli_distribution mutationDistribution;
     Real recurrentConnectionProbability;
     Real connectionWeightRange;
@@ -284,6 +303,15 @@ struct Parameters {
         assert ( numNodes >= 0 );
         assert ( numOutputs > 0 );
         assert ( arity > 0 );
+    }
+
+    // Validate the current parameters.
+    [[ nodiscard ]] bool validateParameters ( ) const noexcept {
+        assert ( numInputs > 0 );
+        assert ( numNodes >= 0 );
+        assert ( numOutputs > 0 );
+        assert ( arity > 0 );
+        assert ( evolutionaryStrategy == '+' or evolutionaryStrategy == ',' );
     }
 
     template<typename ... Args>
@@ -397,9 +425,9 @@ typename Parameters<Real>::Rng Parameters<Real>::rng { std::random_device { } ( 
 template<typename Real>
 struct Node {
 
+    NodeArray<int> inputs;
+    NodeArray<Real> weights;
     int function;
-    std::vector<int> inputs;
-    std::vector<Real> weights;
     bool active;
     Real output;
     int maxArity;
@@ -407,18 +435,17 @@ struct Node {
 
     // Node ( ) { }
     Node ( const Parameters<Real> & params_, const int nodePosition_ ) :
+
+        inputs { maxArity },
+        weights { maxArity },
         function { params_.getRandomFunction ( ) },
-        inputs { },
-        weights { },
         active { true },
         output { Real { 0 } },
         maxArity { params_.arity },
         actArity { params_.arity } {
 
-        inputs.reserve ( maxArity );
-        std::generate_n ( std::back_inserter ( inputs ), maxArity, params_.getRandomNodeInput ( nodePosition_ ) );
-        weights.reserve ( maxArity );
-        std::generate_n ( std::back_inserter ( weights ), maxArity, params_.getRandomConnectionWeight ( ) );
+        std::generate ( std::begin ( inputs ), std::end ( inputs ), params_.getRandomNodeInput ( nodePosition_ ) );
+        std::generate ( std::begin ( weights ), std::end ( weights ), params_.getRandomConnectionWeight ( ) );
     }
 };
 
@@ -431,14 +458,14 @@ struct Chromosome {
     int numNodes;
     int numActiveNodes;
     int arity;
+    int generation;
     std::vector<Node<Real>> nodes;
     std::vector<int> outputNodes;
     std::vector<int> activeNodes;
-    Real fitness;
     std::vector<Real> outputValues;
     std::vector<Real> nodeInputsHold;
     const Parameters<Real> & params;
-    int generation;
+    Real fitness;
 
     // Chromosome ( ) { }
     Chromosome ( const Parameters<Real> & params_ ) :
@@ -447,14 +474,14 @@ struct Chromosome {
         numNodes { params_.numNodes },
         numActiveNodes { numNodes },
         arity { params_.arity },
+        generation { 0 },
         nodes { },
         outputNodes { },
         activeNodes { numActiveNodes },
-        fitness { Real { -1 } },
         outputValues { numOutputs },
         nodeInputsHold { arity },
         params { params_ },
-        generation { 0 } {
+        fitness { Real { -1 } } {
 
         nodes.reserve ( numNodes );
         for ( int nodePosition = 0; nodePosition < numNodes; ++nodePosition )
@@ -463,6 +490,37 @@ struct Chromosome {
         std::generate_n ( std::back_inserter ( outputNodes ), numOutputs, params_.getRandomChromosomeOutput ( ) );
 
         setChromosomeActiveNodes ( );
+    }
+
+
+    // Executes the given chromosome.
+    void execute ( const std::vector<Real> & inputs_ ) noexcept {
+        // For all of the active nodes.
+        for ( const int currentActiveNode : activeNodes ) {
+            const int nodeArity = nodes [ currentActiveNode ].actArity;
+            // For each of the active nodes inputs.
+            for ( int i = 0; i < nodeArity; ++i ) {
+                // Gather the nodes input locations.
+                const int nodeInputLocation = nodes [ currentActiveNode ].inputs [ i ];
+                nodeInputsHold [ i ] = nodeInputLocation < numInputs ? inputs_ [ nodeInputLocation ] : nodes [ nodeInputLocation - numInputs ].output;
+            }
+            // Get the functionality of the active node under evaluation.
+            const int currentActiveNodeFunction = nodes [ currentActiveNode ].function;
+            // calculate the output of the active node under evaluation.
+            nodes [ currentActiveNode ].output = params.funcSet.functions [ currentActiveNodeFunction ] ( nodeInputsHold, nodes [ currentActiveNode ].weights );
+            // Deal with Real's becoming NAN.
+            if ( std::isnan ( nodes [ currentActiveNode ].output ) ) {
+                nodes [ currentActiveNode ].output = Real { 0 };
+            }
+            // Prevent Real's form going to inf and -inf.
+            else if ( std::isinf ( nodes [ currentActiveNode ].output )) {
+                nodes [ currentActiveNode ].output = nodes [ currentActiveNode ].output > Real { 0 } ? std::numeric_limits<Real>::max ( ) : std::numeric_limits<Real>::min ( );
+            }
+        }
+        // Set the chromosome outputs.
+        for ( int i = 0; i < numOutputs; ++i ) {
+            outputValues [ i ] = outputNodes [ i ] < numInputs ? inputs_ [ outputNodes [ i ] ] : nodes [ outputNodes [ i ] - numInputs ].output;
+        }
     }
 
 
@@ -582,7 +640,7 @@ template<typename T>
 }
 
 
-namespace functions {
+namespace function {
 
 // Node function add. Returns the sum of all the inputs.
 template<typename Real> Real f_add ( const std::vector<Real> & inputs_, const std::vector<Real> & connectionWeights_ ) noexcept {
@@ -850,8 +908,12 @@ template<typename Real> Real f_hyperbolicTangent ( const std::vector<Real> & inp
     return tanh ( sumWeigtedInputs ( inputs_, connectionWeights_ ) );
 }
 
-} // namespace functions
+} // namespace function
 } // namespace cgp
 
+#if defined ( DEF_NL )
+#undef nl
+#undef DEF_NL
+#endif
 #undef M64
 #undef M32
