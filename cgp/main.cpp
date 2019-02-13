@@ -35,7 +35,7 @@
 #define nl '\n'
 #endif
 
-#if 1
+#if 0
 
 #include "cgpcpp.hpp"
 
@@ -63,7 +63,7 @@ int main ( ) {
 
 #else
 
-#include "./../src/splitmix.hpp"
+#include <splitmix.hpp>
 #include "./../src/cgp.hpp"
 
 double radius ( const int numInputs, const double *inputs, const double *connectionWeights ) noexcept {

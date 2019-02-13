@@ -27,7 +27,7 @@
 #include <iostream>
 #include <random>
 
-#include "splitmix.hpp"
+#include <splitmix.hpp> // https://github.com/degski/Sax
 
 static splitmix64 rgen { std::random_device { } ( ) };
 
