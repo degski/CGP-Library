@@ -62,9 +62,9 @@
 
 #if M64
 #if defined ( __GNUC__ )
-#include <lehmer.hpp> // https://github.com/degski/Sax
+#include <lehmer.hpp>       // https://github.com/degski/Sax/blob/master/lehmer.hpp
 #else
-#include <splitmix.hpp> // https://github.com/degski/Sax
+#include <splitmix.hpp>     // https://github.com/degski/Sax/blob/master/splitmix.hpp
 #endif
 #endif
 

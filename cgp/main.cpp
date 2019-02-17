@@ -63,7 +63,7 @@ int main ( ) {
 
 #else
 
-#include <splitmix.hpp>
+#include <sax/splitmix.hpp> // https://github.com/degski/Sax/blob/master/splitmix.hpp
 #include "./../src/cgp.hpp"
 
 double radius ( const int numInputs, const double *inputs, const double *connectionWeights ) noexcept {
