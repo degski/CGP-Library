@@ -136,9 +136,9 @@ int main ( ) {
     int numOutputs = 1;
     int nodeArity = 2;
 
-    int numGens = 20'000'000;
+    int numGens = 10'000'000;
     double targetFitness = 0.0;
-    int updateFrequency = 1'000;
+    int updateFrequency = 20'000;
 
     params = initialiseParameters ( numInputs, numNodes, numOutputs, nodeArity );
 
@@ -147,8 +147,7 @@ int main ( ) {
 
     addNodeFunction ( params, "add, mul, abs, 1, wire" );
     addCustomNodeFunction ( params, radius, "rad", 0 );
-    // addCustomNodeFunction ( params, radius2, "2xrad", 0 );
-    // addCustomNodeFunction ( params, int_div, "idiv", 2 );
+    addCustomNodeFunction ( params, int_div, "idiv", 2 );
     addCustomNodeFunction ( params, int_rem, "irem", 2 );
     addCustomNodeFunction ( params, negate, "neg", 1 );
 
@@ -156,11 +155,24 @@ int main ( ) {
 
     setUpdateFrequency ( params, updateFrequency );
     setCustomFitnessFunction ( params, fitnessWithSizePressure, "fitnessWithSizePressure" );
-    setNumThreads ( params, 20 );
+    setNumThreads ( params, 1 );
 
     printParameters ( params );
 
     trainingData = initialiseDataSetFromFile ( "./../data/table.data" );
+
+    struct chromosome * chromo;
+
+    chromo = runCGP ( params, trainingData, numGens );
+
+    printChromosome ( chromo, 0 );
+
+    freeChromosome ( chromo );
+
+
+
+
+    /*
 
     auto results = repeatCGP ( params, trainingData, numGens, 1 );
 
@@ -171,7 +183,8 @@ int main ( ) {
         freeChromosome ( chromo );
     }
 
-    freeResults ( results );
+    */
+    //freeResults ( results );
     freeDataSet ( trainingData );
     freeParameters ( params );
 
